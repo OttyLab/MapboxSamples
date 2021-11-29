@@ -48,6 +48,7 @@ import com.example.navigationsdksample.R
 import com.example.navigationsdksample.databinding.MapboxActivityTurnByTurnExperienceBinding
 import com.mapbox.android.core.permissions.PermissionsListener
 import com.mapbox.api.directions.v5.DirectionsCriteria
+import com.mapbox.api.directions.v5.models.VoiceInstructions
 import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
 import com.mapbox.navigation.base.formatter.UnitType
 import com.mapbox.navigation.base.internal.extensions.LocaleEx.getUnitTypeForLocale
@@ -243,7 +244,15 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
      * Observes when a new voice instruction should be played.
      */
     private val voiceInstructionsObserver = VoiceInstructionsObserver { voiceInstructions ->
-        speechApi.generate(voiceInstructions, speechCallback)
+        val announcement = voiceInstructions.announcement()?.replace(Regex("です。"), "デステニー。")
+        val ssmlAnnouncement = voiceInstructions.ssmlAnnouncement()?.replace(Regex("です。"), "デステニー。")
+        val customVoiceInstructions = VoiceInstructions.builder()
+            .announcement(announcement)
+            .ssmlAnnouncement(ssmlAnnouncement)
+            .distanceAlongGeometry(voiceInstructions.distanceAlongGeometry())
+            .build();
+
+        speechApi.generate(customVoiceInstructions, speechCallback)
     }
 
     /**
