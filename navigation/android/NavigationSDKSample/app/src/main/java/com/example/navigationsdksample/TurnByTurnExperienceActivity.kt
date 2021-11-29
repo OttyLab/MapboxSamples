@@ -47,6 +47,12 @@ import com.mapbox.navigation.core.trip.session.VoiceInstructionsObserver
 import com.example.navigationsdksample.R
 import com.example.navigationsdksample.databinding.MapboxActivityTurnByTurnExperienceBinding
 import com.mapbox.android.core.permissions.PermissionsListener
+import com.mapbox.api.directions.v5.DirectionsCriteria
+import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
+import com.mapbox.navigation.base.formatter.UnitType
+import com.mapbox.navigation.base.internal.extensions.LocaleEx.getUnitTypeForLocale
+import com.mapbox.navigation.base.internal.extensions.inferDeviceLanguage
+import com.mapbox.navigation.base.internal.extensions.inferDeviceLocale
 import com.mapbox.navigation.ui.base.util.MapboxNavigationConsumer
 import com.mapbox.navigation.ui.maneuver.api.MapboxManeuverApi
 import com.mapbox.navigation.ui.maneuver.view.MapboxManeuverView
@@ -493,12 +499,12 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
         speechApi = MapboxSpeechApi(
             this,
             getString(R.string.mapbox_access_token),
-            Locale.US.language
+            applicationContext.inferDeviceLanguage()
         )
         voiceInstructionsPlayer = MapboxVoiceInstructionsPlayer(
             this,
             getString(R.string.mapbox_access_token),
-            Locale.US.language
+            applicationContext.inferDeviceLanguage()
         )
 
         // initialize route line, the withRouteLineBelowLayerId is specified to place
@@ -615,6 +621,8 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
             RouteOptions.builder()
                 .applyDefaultNavigationOptions()
                 .applyLanguageAndVoiceUnitOptions(this)
+                .language(application.inferDeviceLanguage())
+                .voiceUnits(if(application.inferDeviceLocale().getUnitTypeForLocale() == UnitType.METRIC) DirectionsCriteria.METRIC else DirectionsCriteria.IMPERIAL)
                 .coordinatesList(listOf(originPoint, destination))
                 // provide the bearing for the origin of the request to ensure
                 // that the returned route faces in the direction of the current user movement
