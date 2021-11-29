@@ -437,6 +437,8 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
 
         // initialize Navigation Camera
         viewportDataSource = MapboxNavigationViewportDataSource(mapboxMap)
+        viewportDataSource.options.followingFrameOptions.minZoom = 16.0
+        viewportDataSource.options.followingFrameOptions.maxZoom = 18.0
         navigationCamera = NavigationCamera(
             mapboxMap,
             binding.mapView.camera,
@@ -668,8 +670,8 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
         binding.routeOverview.visibility = View.VISIBLE
         binding.tripProgressCard.visibility = View.VISIBLE
 
-        // move the camera to overview when new route is available
-        navigationCamera.requestNavigationCameraToOverview()
+        // move the camera to following when new route is available
+        navigationCamera.requestNavigationCameraToFollowing()
     }
 
     private fun clearRouteAndStopNavigation() {
