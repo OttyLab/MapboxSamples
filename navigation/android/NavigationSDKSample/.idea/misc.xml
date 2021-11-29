@@ -3,6 +3,7 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="../../../../../../.gradle/caches/transforms-3/e0a64f77b0642271c06063e2375586d2/transformed/jetified-ui-maps-2.0.2/res/drawable/mapbox_navigation_puck_icon.xml" value="0.209375" />
         <entry key="app/src/main/res/layout/activity_main.xml" value="0.19322916666666667" />
         <entry key="app/src/main/res/layout/mapbox_activity_turn_by_turn_experience.xml" value="0.19322916666666667" />
       </map>

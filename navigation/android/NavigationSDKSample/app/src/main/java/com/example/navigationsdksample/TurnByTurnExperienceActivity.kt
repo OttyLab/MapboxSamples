@@ -1,14 +1,17 @@
 package com.example.navigationsdksample
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.location.Location
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.example.navigationsdksample.LocationPermissionsHelper.Companion.areLocationPermissionsGranted
 import com.mapbox.api.directions.v5.models.Bearing
 import com.mapbox.api.directions.v5.models.DirectionsRoute
 import com.mapbox.api.directions.v5.models.RouteOptions
@@ -43,6 +46,7 @@ import com.mapbox.navigation.core.trip.session.RouteProgressObserver
 import com.mapbox.navigation.core.trip.session.VoiceInstructionsObserver
 import com.example.navigationsdksample.R
 import com.example.navigationsdksample.databinding.MapboxActivityTurnByTurnExperienceBinding
+import com.mapbox.android.core.permissions.PermissionsListener
 import com.mapbox.navigation.ui.base.util.MapboxNavigationConsumer
 import com.mapbox.navigation.ui.maneuver.api.MapboxManeuverApi
 import com.mapbox.navigation.ui.maneuver.view.MapboxManeuverView
@@ -99,26 +103,11 @@ import java.util.Locale
  * - At any point in time you can finish guidance or select a new destination.
  * - You can use buttons to mute/unmute voice instructions, recenter the camera, or show the route overview.
  */
-class TurnByTurnExperienceActivity : AppCompatActivity() {
+class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
 
     private companion object {
         private const val BUTTON_ANIMATION_DURATION = 1500L
     }
-
-    /**
-     * Debug tool used to play, pause and seek route progress events that can be used to produce mocked location updates along the route.
-     */
-    private val mapboxReplayer = MapboxReplayer()
-
-    /**
-     * Debug tool that mocks location updates with an input from the [mapboxReplayer].
-     */
-    private val replayLocationEngine = ReplayLocationEngine(mapboxReplayer)
-
-    /**
-     * Debug observer that makes sure the replayer has always an up-to-date information to generate mock updates.
-     */
-    private val replayProgressObserver = ReplayProgressObserver(mapboxReplayer)
 
     /**
      * Bindings to the example layout.
@@ -290,6 +279,8 @@ class TurnByTurnExperienceActivity : AppCompatActivity() {
      */
     private val navigationLocationProvider = NavigationLocationProvider()
 
+    private val permissionsHelper = LocationPermissionsHelper(this)
+
     /**
      * Gets notified with location updates.
      *
@@ -434,8 +425,6 @@ class TurnByTurnExperienceActivity : AppCompatActivity() {
             MapboxNavigationProvider.create(
                 NavigationOptions.Builder(this.applicationContext)
                     .accessToken(getString(R.string.mapbox_access_token))
-                    // comment out the location engine setting block to disable simulation
-                    .locationEngine(replayLocationEngine)
                     .build()
             )
         }
@@ -559,7 +548,11 @@ class TurnByTurnExperienceActivity : AppCompatActivity() {
 
         // start the trip session to being receiving location updates in free drive
         // and later when a route is set also receiving route progress updates
-        mapboxNavigation.startTripSession()
+        if (areLocationPermissionsGranted(this)) {
+            mapboxNavigation.startTripSession()
+        } else {
+            permissionsHelper.requestLocationPermissions(this)
+        }
     }
 
     override fun onStart() {
@@ -570,22 +563,6 @@ class TurnByTurnExperienceActivity : AppCompatActivity() {
         mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
         mapboxNavigation.registerLocationObserver(locationObserver)
         mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
-        mapboxNavigation.registerRouteProgressObserver(replayProgressObserver)
-
-        if (mapboxNavigation.getRoutes().isEmpty()) {
-            // if simulation is enabled (ReplayLocationEngine set to NavigationOptions)
-            // but we're not simulating yet,
-            // push a single location sample to establish origin
-            mapboxReplayer.pushEvents(
-                listOf(
-                    ReplayRouteMapper.mapToUpdateLocation(
-                        eventTimestamp = 0.0,
-                        point = Point.fromLngLat(-122.39726512303575, 37.785128345296805)
-                    )
-                )
-            )
-            mapboxReplayer.playFirstLocation()
-        }
     }
 
     override fun onStop() {
@@ -596,7 +573,6 @@ class TurnByTurnExperienceActivity : AppCompatActivity() {
         mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
         mapboxNavigation.unregisterLocationObserver(locationObserver)
         mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
-        mapboxNavigation.unregisterRouteProgressObserver(replayProgressObserver)
     }
 
     override fun onDestroy() {
@@ -604,6 +580,24 @@ class TurnByTurnExperienceActivity : AppCompatActivity() {
         MapboxNavigationProvider.destroy()
         speechApi.cancel()
         voiceInstructionsPlayer.shutdown()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        permissionsHelper.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
+    override fun onExplanationNeeded(permissionsToExplain: MutableList<String>?) {
+    }
+
+    @SuppressLint("MissingPermission")
+    override fun onPermissionResult(granted: Boolean) {
+        if (granted) {
+            mapboxNavigation.startTripSession()
+        }
     }
 
     private fun findRoute(destination: Point) {
@@ -661,9 +655,6 @@ class TurnByTurnExperienceActivity : AppCompatActivity() {
         // will be used for active guidance
         mapboxNavigation.setRoutes(routes)
 
-        // start location simulation along the primary route
-        startSimulation(routes.first())
-
         // show UI elements
         binding.soundButton.visibility = View.VISIBLE
         binding.routeOverview.visibility = View.VISIBLE
@@ -677,24 +668,10 @@ class TurnByTurnExperienceActivity : AppCompatActivity() {
         // clear
         mapboxNavigation.setRoutes(listOf())
 
-        // stop simulation
-        mapboxReplayer.stop()
-
         // hide UI elements
         binding.soundButton.visibility = View.INVISIBLE
         binding.maneuverView.visibility = View.INVISIBLE
         binding.routeOverview.visibility = View.INVISIBLE
         binding.tripProgressCard.visibility = View.INVISIBLE
-    }
-
-    private fun startSimulation(route: DirectionsRoute) {
-        mapboxReplayer.run {
-            stop()
-            clearEvents()
-            val replayEvents = ReplayRouteMapper().mapDirectionsRouteGeometry(route)
-            pushEvents(replayEvents)
-            seekTo(replayEvents.first())
-            play()
-        }
     }
 }
