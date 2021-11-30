@@ -523,7 +523,7 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
         // the value of this option will depend on the style that you are using
         // and under which layer the route line should be placed on the map layers stack
         val mapboxRouteLineOptions = MapboxRouteLineOptions.Builder(this)
-            .withRouteLineBelowLayerId("road-label")
+            .withRouteLineBelowLayerId("road-label-motorway-trunk")
             .build()
         routeLineApi = MapboxRouteLineApi(mapboxRouteLineOptions)
         routeLineView = MapboxRouteLineView(mapboxRouteLineOptions)
@@ -534,7 +534,7 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
 
         // load map style
         mapboxMap.loadStyleUri(
-            Style.MAPBOX_STREETS
+            Style.TRAFFIC_DAY
         ) {
             // add long click listener that search for a route to the clicked destination
             binding.mapView.gestures.addOnMapLongClickListener { point ->
