@@ -49,6 +49,7 @@ import com.example.navigationsdksample.databinding.MapboxActivityTurnByTurnExper
 import com.mapbox.android.core.permissions.PermissionsListener
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.VoiceInstructions
+import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
 import com.mapbox.navigation.base.formatter.UnitType
 import com.mapbox.navigation.base.internal.extensions.LocaleEx.getUnitTypeForLocale
@@ -334,6 +335,13 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
         }
     }
 
+    private val onPositionChangedListener = OnIndicatorPositionChangedListener { point ->
+        val result = routeLineApi.updateTraveledRouteLine(point)
+        mapboxMap.getStyle()?.apply {
+            routeLineView.renderRouteLineUpdate(this, result)
+        }
+    }
+
     /**
      * Gets notified with progress along the currently active route.
      */
@@ -369,6 +377,8 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
         binding.tripProgressView.render(
             tripProgressApi.getTripProgress(routeProgress)
         )
+
+        routeLineApi.updateWithRouteProgress(routeProgress,{})
     }
 
     /**
@@ -524,6 +534,7 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
         // and under which layer the route line should be placed on the map layers stack
         val mapboxRouteLineOptions = MapboxRouteLineOptions.Builder(this)
             .withRouteLineBelowLayerId("road-label-motorway-trunk")
+            .withVanishingRouteLineEnabled(true)
             .build()
         routeLineApi = MapboxRouteLineApi(mapboxRouteLineOptions)
         routeLineView = MapboxRouteLineView(mapboxRouteLineOptions)
@@ -586,6 +597,7 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
         super.onStop()
 
         // unregister event listeners to prevent leaks or unnecessary resource consumption
+        binding.mapView.location.removeOnIndicatorPositionChangedListener(onPositionChangedListener)
         mapboxNavigation.unregisterRoutesObserver(routesObserver)
         mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
         mapboxNavigation.unregisterLocationObserver(locationObserver)
@@ -670,6 +682,8 @@ class TurnByTurnExperienceActivity : AppCompatActivity(), PermissionsListener {
     }
 
     private fun setRouteAndStartNavigation(routes: List<DirectionsRoute>) {
+        binding.mapView.location.addOnIndicatorPositionChangedListener(onPositionChangedListener)
+
         // set routes, where the first route in the list is the primary route that
         // will be used for active guidance
         mapboxNavigation.setRoutes(routes)
